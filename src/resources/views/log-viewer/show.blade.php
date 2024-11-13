@@ -8,6 +8,15 @@
         .clickable-row {
             cursor: pointer;
         }
+
+        pre {
+            background-color: #f1f1f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-family: 'Roboto Mono', monospace;
+        }
     </style>
 @endpush
 
@@ -84,10 +93,10 @@
                     const json = JSON.parse(description);
                     formattedDescription = JSON.stringify(json, null, 2);
                 } catch (e) {
-                    formattedDescription = description.replace(/\n/g, '<br>');
+                    formattedDescription = description;
                 }
 
-                document.getElementById('logDescription').innerHTML = `<pre>${formattedDescription}</pre>`;
+                document.getElementById('logDescription').innerHTML = `<pre class="bg-custom p-3 rounded">${formattedDescription}<pre/>`;
                 new bootstrap.Modal(document.getElementById('logDetailModal')).show();
             }
         </script>

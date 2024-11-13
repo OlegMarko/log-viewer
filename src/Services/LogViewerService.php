@@ -13,7 +13,7 @@ class LogViewerService
             $structure[basename($folder)] = $this->getDirectoryStructure($folder);
         }
         foreach (File::files($directory) as $file) {
-            if ($file->getExtension() === 'log' || $file->getExtension() === 'xml') {
+            if (in_array($file->getExtension(), ['log', 'xml'])) {
                 $structure[] = ['name' => $file->getFilename(), 'path' => $file->getRealPath()];
             }
         }
@@ -38,7 +38,7 @@ class LogViewerService
             while (!feof($fp)) {
                 $line = fgets($fp);
 
-                if (preg_match('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]/', $line)) {
+                if (preg_match('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}]/', $line)) {
                     if (!empty($currentEntry)) {
                         $this->processLogEntry($currentEntry, $entries, $counts);
                     }
@@ -63,7 +63,7 @@ class LogViewerService
 
     private function processLogEntry($entry, &$entries, &$counts): void
     {
-        if (preg_match('/^\[(.*?)\]\s(\w+)\.(\w+):\s(.*)/s', $entry, $matches)) {
+        if (preg_match('/^\[(.*?)]\s(\w+)\.(\w+):\s(.*)/s', $entry, $matches)) {
             $type = strtolower($matches[3]);
 
             if (isset($counts[$type])) {
@@ -72,13 +72,14 @@ class LogViewerService
                 $counts['other']++;
             }
 
-            $description = trim(preg_replace('/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]\s\w+\.\w+:\s/', '', $entry));
+            $pattern = '/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}]\s\w+\.\w+:\s/';
+            $description = preg_replace($pattern, '', $entry);
 
             $entries[] = [
                 'time' => $matches[1],
                 'env' => $matches[2],
                 'type' => $type,
-                'description' => $description
+                'description' => trim($description)
             ];
         }
     }
