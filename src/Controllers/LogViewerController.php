@@ -35,10 +35,22 @@ class LogViewerController extends Controller
 
         if (pathinfo($filePath, PATHINFO_EXTENSION) === 'xml') {
             $xmlContent = File::get($filePath);
-            return view('log-viewer::log-viewer.show-xml', [
+            return view('log-viewer::log-viewer.show-data', [
                 'filePath' => $filePath,
                 'filename' => $filename,
                 'xmlContent' => $xmlContent
+            ]);
+        }
+
+        if (pathinfo($filePath, PATHINFO_EXTENSION) === 'json') {
+            $jsonContent = File::get($filePath);
+            $jsonContentDecoded = json_decode($jsonContent, true);
+            $jsonContentEncoded = json_encode($jsonContentDecoded, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
+
+            return view('log-viewer::log-viewer.show-data', [
+                'filePath' => $filePath,
+                'filename' => $filename,
+                'xmlContent' => $jsonContentEncoded
             ]);
         }
 

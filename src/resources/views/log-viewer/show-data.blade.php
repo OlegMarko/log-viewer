@@ -17,7 +17,7 @@
 @endpush
 
 @section('content')
-    <a href="{{ route('logs.index', ['dir' => dirname($filePath)]) }}" class="btn btn-secondary mb-4">
+    <a href="{{ route('logs.index', ['dir' => dirname($filePath)]) }}" class="btn btn-sm btn-secondary mb-4">
         <i class="bi bi-arrow-left"></i> Back to Logs
     </a>
 

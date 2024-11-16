@@ -13,7 +13,7 @@ class LogViewerService
             $structure[basename($folder)] = $this->getDirectoryStructure($folder);
         }
         foreach (File::files($directory) as $file) {
-            if (in_array($file->getExtension(), ['log', 'xml'])) {
+            if (in_array($file->getExtension(), ['log', 'json', 'xml'])) {
                 $structure[] = ['name' => $file->getFilename(), 'path' => $file->getRealPath()];
             }
         }
@@ -28,6 +28,8 @@ class LogViewerService
             'info' => 0,
             'error' => 0,
             'warning' => 0,
+            'critical' => 0,
+            'debug' => 0,
             'other' => 0
         ];
 
@@ -72,15 +74,36 @@ class LogViewerService
                 $counts['other']++;
             }
 
-            $pattern = '/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}]\s\w+\.\w+:\s/';
-            $description = preg_replace($pattern, '', $entry);
+            $description = $matches[4];
+            $jsonPart = null;
+            $onlyJson = false;
+
+            if (preg_match('/^(.*?)({.*})$/s', $description, $descMatches)) {
+                $jsonPart = $descMatches[2];
+            } elseif ($this->isJson($description)) {
+                $onlyJson = true;
+                $jsonPart = $description;
+            }
+
+            $jsonDecoded = $jsonPart ? json_decode($jsonPart, true) : null;
+            $prettyJson = $jsonDecoded ?
+                json_encode($jsonDecoded, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) :
+                null;
 
             $entries[] = [
-                'time' => $matches[1],
-                'env' => $matches[2],
+                'time' => $matches[1] ?? null,
+                'env' => $matches[2] ?? null,
                 'type' => $type,
-                'description' => trim($description)
+                'description' => $description,
+                'json' => $prettyJson,
+                'only_json' => $onlyJson
             ];
         }
+    }
+
+    private function isJson(?string $string): bool
+    {
+        json_decode($string);
+        return (json_last_error() == JSON_ERROR_NONE);
     }
 }

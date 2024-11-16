@@ -24,7 +24,7 @@
 </head>
 <body>
 <div class="container">
-    <h1 class="text-primary">@yield('heading')</h1>
+    <h3 class="text-secondary">@yield('heading')</h3>
     @yield('content')
 </div>
 
