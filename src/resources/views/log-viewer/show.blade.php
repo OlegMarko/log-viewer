@@ -31,7 +31,7 @@
 @endpush
 
 @section('content')
-    <a href="{{ route('logs.index', ['dir' => dirname($filePath)]) }}" class="btn btn-sm btn-secondary mb-4">
+    <a href="{{ route('log-viewer.index', ['dir' => dirname($filePath)]) }}" class="btn btn-sm btn-secondary mb-4">
         <i class="bi bi-arrow-left"></i> Back to Logs
     </a>
 
@@ -85,6 +85,7 @@
                         <!-- Hidden fields to store the plain description and JSON -->
                         @unless($entry['only_json'])
                             <input type="hidden" id="logDescription{{ $index }}" value="{{ $entry['description'] }}">
+                            <input type="hidden" id="logDescription{{ $index }}_payload_description" value="{{ $entry['payload_description'] }}">
                         @endunless
                         <input type="hidden" id="logDescription{{ $index }}_payload" value="{{ $entry['json'] }}">
                     </tr>
@@ -117,9 +118,16 @@
             function showLogDetails(elementId) {
                 let modalContent = '';
 
-                const description = document.getElementById(elementId);
-                if (description && description.value !== undefined && description.value) {
-                    modalContent += `<span class="modal-sub-title">Message:</span><pre class="bg-custom p-3 rounded">${description.value}</pre>`;
+                const payload_description = document.getElementById(`${elementId}_payload_description`);
+                if (payload_description && payload_description.value !== undefined && payload_description.value) {
+                    modalContent += `<span class="modal-sub-title">Message:</span><pre class="bg-custom p-3 rounded">${payload_description.value}</pre>`;
+                }
+
+                if (modalContent === '') {
+                    const description = document.getElementById(elementId);
+                    if (description && description.value !== undefined && description.value) {
+                        modalContent += `<span class="modal-sub-title">Message:</span><pre class="bg-custom p-3 rounded">${description.value}</pre>`;
+                    }
                 }
 
                 const jsonData = document.getElementById(`${elementId}_payload`);

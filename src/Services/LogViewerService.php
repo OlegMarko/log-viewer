@@ -76,10 +76,12 @@ class LogViewerService
 
             $description = $matches[4];
             $jsonPart = null;
+            $payloadDescription = null;
             $onlyJson = false;
 
-            if (preg_match('/^(.*?)({.*})$/s', $description, $descMatches)) {
+            if (preg_match('/^(.*?)\s(\{.*})$/', $description, $descMatches)) {
                 $jsonPart = $descMatches[2];
+                $payloadDescription = $descMatches[1];
             } elseif ($this->isJson($description)) {
                 $onlyJson = true;
                 $jsonPart = $description;
@@ -95,6 +97,7 @@ class LogViewerService
                 'env' => $matches[2] ?? null,
                 'type' => $type,
                 'description' => $description,
+                'payload_description' => $payloadDescription,
                 'json' => $prettyJson,
                 'only_json' => $onlyJson
             ];
