@@ -13,12 +13,36 @@ class LogViewerService
             $structure[basename($folder)] = $this->getDirectoryStructure($folder);
         }
         foreach (File::files($directory) as $file) {
-            if (in_array($file->getExtension(), ['log', 'json', 'xml'])) {
-                $structure[] = ['name' => $file->getFilename(), 'path' => $file->getRealPath()];
+            if ($file->isReadable() && in_array($file->getExtension(), ['log', 'json', 'xml'])) {
+                $structure[] = [
+                    'name' => $file->getFilename(),
+                    'path' => $file->getRealPath(),
+                    'size' => $this->formatBytes($file->getSize())
+                ];
             }
         }
 
         return $structure;
+    }
+
+    private function formatBytes(int $bytes, int $precision = 2): string
+    {
+        // For 1-100 bytes, return as "B".
+        if ($bytes <= 100) {
+            return $bytes . ' B';
+        }
+
+        // For 101-1024 bytes, format as "0.* KB".
+        if ($bytes <= 1024) {
+            return round($bytes / 1024, $precision) . ' KB';
+        }
+
+        // Beyond 1024, use standard KB, MB, GB, etc.
+        $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+        $pow = min(floor(log($bytes, 1024)), count($units) - 1);
+        $size = $bytes / pow(1024, $pow);
+
+        return round($size, $precision) . ' ' . $units[$pow];
     }
 
     public function getLogContents($filePath): array
@@ -79,7 +103,7 @@ class LogViewerService
             $payloadDescription = null;
             $onlyJson = false;
 
-            if (preg_match('/^(.*?)\s(\{.*})$/', $description, $descMatches)) {
+            if (preg_match('/^(.*?)\s*?\s(\{.*\})$/', $description, $descMatches)) {
                 $jsonPart = $descMatches[2];
                 $payloadDescription = $descMatches[1];
             } elseif ($this->isJson($description)) {

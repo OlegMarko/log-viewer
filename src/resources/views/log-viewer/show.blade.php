@@ -19,6 +19,10 @@
             margin-bottom: 5px;
         }
 
+        .download-form {
+            float: right;
+        }
+
         pre {
             background-color: #f1f1f1;
             padding: 15px;
@@ -34,6 +38,15 @@
     <a href="{{ route('log-viewer.index', ['dir' => dirname($filePath)]) }}" class="btn btn-sm btn-secondary mb-4">
         <i class="bi bi-arrow-left"></i> Back to Logs
     </a>
+    <form class="download-form" method="POST" action="{{ route('log-viewer.download') }}">
+        @csrf
+
+        <input type="hidden" name="filename" value="{{ $filename }}">
+
+        <button type="submit" class="btn btn-sm btn-primary mb-4">
+            <i class="bi bi-download"></i> Download
+        </button>
+    </form>
 
     <div class="card mb-4">
         <div class="card-body">
@@ -120,23 +133,45 @@
 
                 const payload_description = document.getElementById(`${elementId}_payload_description`);
                 if (payload_description && payload_description.value !== undefined && payload_description.value) {
-                    modalContent += `<span class="modal-sub-title">Message:</span><pre class="bg-custom p-3 rounded">${payload_description.value}</pre>`;
+                    modalContent += `
+                    <span class="modal-sub-title">Message:</span>
+                    <div class="d-flex align-items-center">
+                        <pre class="bg-custom p-3 rounded flex-grow-1" id="messageContent">${payload_description.value}</pre>
+                        <button class="btn btn-outline-secondary btn-sm ms-2" onclick="copyToClipboard('messageContent')">Copy</button>
+                    </div>`;
                 }
 
                 if (modalContent === '') {
                     const description = document.getElementById(elementId);
                     if (description && description.value !== undefined && description.value) {
-                        modalContent += `<span class="modal-sub-title">Message:</span><pre class="bg-custom p-3 rounded">${description.value}</pre>`;
+                        modalContent += `
+                        <span class="modal-sub-title">Message:</span>
+                        <div class="d-flex align-items-center">
+                            <pre class="bg-custom p-3 rounded flex-grow-1" id="messageContent">${description.value}</pre>
+                            <button class="btn btn-outline-secondary btn-sm ms-2" onclick="copyToClipboard('messageContent')">Copy</button>
+                        </div>`;
                     }
                 }
 
                 const jsonData = document.getElementById(`${elementId}_payload`);
                 if (jsonData && jsonData.value !== undefined && jsonData.value) {
-                    modalContent += `<span class="modal-sub-title">Payload:</span><pre class="bg-custom p-3 rounded">${jsonData.value}</pre>`;
+                    modalContent += `
+                    <span class="modal-sub-title">Payload:</span>
+                    <div class="d-flex align-items-center">
+                        <pre class="bg-custom p-3 rounded flex-grow-1" id="payloadContent">${jsonData.value}</pre>
+                        <button class="btn btn-outline-secondary btn-sm ms-2" onclick="copyToClipboard('payloadContent')">Copy</button>
+                    </div>`;
                 }
 
                 document.getElementById('logDescription').innerHTML = modalContent;
                 new bootstrap.Modal(document.getElementById('logDetailModal')).show();
+            }
+
+            function copyToClipboard(elementId) {
+                const content = document.getElementById(elementId);
+                if (content) {
+                    navigator.clipboard.writeText(content.textContent || content.innerText).then(() => {}).catch(err => {});
+                }
             }
         </script>
     @endpush

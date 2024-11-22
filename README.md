@@ -85,10 +85,14 @@ To display XML logs, use the following snippet in your Blade templates:
 
 ### Changing Log Directory
 
-Specify a different log directory in the config file:
+Specify a different log directory, route or middleware in the config file:
 
 ```php
 'log_directory' => storage_path('custom-logs'),
+'routes' => [
+     'prefix' => env('LOG_VIEWER_ROUTE_PREFIX', 'log-viewer'),
+     'middleware' => env('LOG_VIEWER_ROUTE_MIDDLEWARE', 'web'),
+ ]
 ```
 
 ## Support
