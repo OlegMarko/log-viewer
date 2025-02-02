@@ -10,6 +10,11 @@
             white-space: pre-wrap;
             font-family: 'Roboto Mono', monospace;
         }
+        .file-perm {
+            color: #ddd;
+            white-space: pre-wrap;
+            font-family: 'Roboto Mono', monospace;
+        }
     </style>
 @endpush
 

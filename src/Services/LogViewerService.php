@@ -9,15 +9,22 @@ class LogViewerService
     public function getDirectoryStructure($directory): array
     {
         $structure = [];
+
         foreach (File::directories($directory) as $folder) {
-            $structure[basename($folder)] = $this->getDirectoryStructure($folder);
+            $folderInfo = new \SplFileInfo($folder);
+            $structure[basename($folder)] = [
+                'folder_structure' => $this->getDirectoryStructure($folder),
+                'folder_perms'     => substr(sprintf('%o', $folderInfo->getPerms()), -4),
+            ];
         }
+
         foreach (File::files($directory) as $file) {
             if ($file->isReadable() && in_array($file->getExtension(), ['log', 'json', 'xml'])) {
                 $structure[] = [
-                    'name' => $file->getFilename(),
-                    'path' => $file->getRealPath(),
-                    'size' => $this->formatBytes($file->getSize())
+                    'name'  => $file->getFilename(),
+                    'path'  => $file->getRealPath(),
+                    'size'  => $this->formatBytes($file->getSize()),
+                    'perms' => substr(sprintf('%o', $file->getPerms()), -4)
                 ];
             }
         }
