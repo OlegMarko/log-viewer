@@ -1,7 +1,7 @@
 @extends('log-viewer::log-viewer.layouts.main')
 
-@section('title', "Viewing Log: $filename")
-@section('heading', "Viewing Log: $filename")
+@section('title', "Viewing Log: $fileName")
+@section('heading', "Viewing Log: $fileName")
 
 @push('head')
     <style>
@@ -31,20 +31,36 @@
             white-space: pre-wrap;
             font-family: 'Roboto Mono', monospace;
         }
+
+        .delete-form {
+            float: right;
+            margin-right: 1rem;
+        }
     </style>
 @endpush
 
 @section('content')
-    <a href="{{ route('log-viewer.index', ['dir' => dirname($filePath)]) }}" class="btn btn-sm btn-secondary mb-4">
+    <a href="{{ route('log-viewer.index') }}" class="btn btn-sm btn-secondary mb-4">
         <i class="bi bi-arrow-left"></i> Back to Logs
     </a>
     <form class="download-form" method="POST" action="{{ route('log-viewer.download') }}">
         @csrf
 
-        <input type="hidden" name="filename" value="{{ $filename }}">
+        <input type="hidden" name="path" value="{{ $filePath }}">
+        <input type="hidden" name="file" value="{{ $fileName }}">
 
         <button type="submit" class="btn btn-sm btn-primary mb-4">
             <i class="bi bi-download"></i> Download
+        </button>
+    </form>
+    <form class="delete-form" method="POST" action="{{ route('log-viewer.delete-file') }}">
+        @csrf
+
+        <input type="hidden" name="path" value="{{ $filePath }}">
+        <input type="hidden" name="file" value="{{ $fileName }}">
+
+        <button type="submit" class="btn btn-sm btn-danger mb-4">
+            <i class="bi bi-download"></i> Destroy
         </button>
     </form>
 
@@ -53,23 +69,23 @@
             <h5 class="card-title">Log Summary</h5>
             <div class="row">
                 <div class="col text-danger">
-                    @include('log-viewer::log-viewer.partials.log-icon', ['type' => 'critical'])
+                    <i class="bi bi-exclamation-diamond text-danger"></i>
                     Critical: {{ $counts['critical'] }}
                 </div>
                 <div class="col text-danger">
-                    @include('log-viewer::log-viewer.partials.log-icon', ['type' => 'error'])
+                    <i class="bi bi-x-circle text-danger"></i>
                     Errors: {{ $counts['error'] }}
                 </div>
                 <div class="col text-info">
-                    @include('log-viewer::log-viewer.partials.log-icon', ['type' => 'info'])
+                    <i class="bi bi-info-circle text-info"></i>
                     Info: {{ $counts['info'] }}
                 </div>
                 <div class="col text-warning">
-                    @include('log-viewer::log-viewer.partials.log-icon', ['type' => 'warning'])
+                    <i class="bi bi-exclamation-triangle text-warning"></i>
                     Warnings: {{ $counts['warning'] }}
                 </div>
                 <div class="col text-muted">
-                    @include('log-viewer::log-viewer.partials.log-icon', ['type' => 'other'])
+                    <i class="bi bi-file-earmark-text text-muted"></i>
                     Other: {{ $counts['other'] }}
                 </div>
             </div>
@@ -90,10 +106,28 @@
                 <tbody>
                 @foreach ($logContents as $index => $entry)
                     <tr class="clickable-row {{ $entry['type'] }}" onclick="showLogDetails('logDescription{{ $index }}')">
-                        <td>@include('log-viewer::log-viewer.partials.log-icon', ['type' => $entry['type']]) {{ ucfirst($entry['type']) }}</td>
+                        <td>
+                            @switch($entry['type'])
+                                @case('critical')
+                                    <i class="bi bi-exclamation-diamond text-danger"></i>
+                                    @break
+                                @case('error')
+                                    <i class="bi bi-x-circle text-danger"></i>
+                                    @break
+                                @case('info')
+                                    <i class="bi bi-info-circle text-info"></i>
+                                    @break
+                                @case('warning')
+                                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                                    @break
+                                @default
+                                    <i class="bi bi-file-earmark-text text-muted"></i>
+                            @endswitch
+                            {{ ucfirst($entry['type']) }}
+                        </td>
                         <td>{{ $entry['time'] }}</td>
                         <td>{{ $entry['env'] }}</td>
-                        <td>{{ \Illuminate\Support\Str::limit($entry['description'], 80) }}</td>
+                        <td>{{ $entry['short_description'] }}</td>
 
                         <!-- Hidden fields to store the plain description and JSON -->
                         @unless($entry['only_json'])
@@ -154,7 +188,7 @@
                 }
 
                 const jsonData = document.getElementById(`${elementId}_payload`);
-                if (jsonData && jsonData.value !== undefined && jsonData.value) {
+                if (jsonData && jsonData.value !== undefined && jsonData.value != 'null' && jsonData.value) {
                     modalContent += `
                     <span class="modal-sub-title">Payload:</span>
                     <div class="d-flex align-items-center">
@@ -173,6 +207,16 @@
                     navigator.clipboard.writeText(content.textContent || content.innerText).then(() => {}).catch(err => {});
                 }
             }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                document.querySelectorAll(".delete-form").forEach(form => {
+                    form.addEventListener("submit", function (event) {
+                        if (!confirm("Are you sure you want to delete this file?")) {
+                            event.preventDefault();
+                        }
+                    });
+                });
+            });
         </script>
     @endpush
 @endsection

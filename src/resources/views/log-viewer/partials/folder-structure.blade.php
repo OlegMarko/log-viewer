@@ -2,7 +2,7 @@
     @if (is_array($item) && isset($item['name']) && isset($item['path']))
         <!-- Log File -->
         <li class="list-group-item">
-            <a href="{{ route('log-viewer.show', ['filename' => $item['name'], 'path' => $item['path']]) }}"
+            <a href="{{ route('log-viewer.show', ['file' => $item['name'], 'path' => $item['path']]) }}"
                class="text-decoration-none text-primary">
                 📄 <span class="file-perm">{{ $item['perms'] ?? null }}</span> {{ $item['name'] }}
                 <span class="file-size">{{ $item['size'] }}</span>

@@ -15,6 +15,9 @@
             white-space: pre-wrap;
             font-family: 'Roboto Mono', monospace;
         }
+        .delete-form {
+            float: right;
+        }
     </style>
 @endpush
 
@@ -22,4 +25,18 @@
     <ul class="list-group">
         @include('log-viewer::log-viewer.partials.folder-structure', ['structure' => $logStructure])
     </ul>
+
+    @push('scripts')
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                document.querySelectorAll(".delete-form").forEach(form => {
+                    form.addEventListener("submit", function (event) {
+                        if (!confirm("Are you sure you want to delete this file?")) {
+                            event.preventDefault();
+                        }
+                    });
+                });
+            });
+        </script>
+    @endpush
 @endsection

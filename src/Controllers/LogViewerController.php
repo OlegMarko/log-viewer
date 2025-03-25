@@ -3,9 +3,13 @@
 namespace Fixik\LogViewer\Controllers;
 
 use Fixik\LogViewer\Services\LogViewerService;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class LogViewerController extends Controller
@@ -19,66 +23,108 @@ class LogViewerController extends Controller
         $this->logViewer = $logViewer;
     }
 
-    public function index()
+    public function index(): View
     {
         $logStructure = $this->logViewer->getDirectoryStructure($this->logDir);
 
         return view('log-viewer::log-viewer.index', compact('logStructure'));
     }
 
-    public function show($filename, Request $request)
+    /**
+     * @throws FileNotFoundException
+     */
+    public function show(Request $request): View
     {
+        $fileName = $request->query('file');
         $filePath = $request->query('path');
+        $fullPath = config('log-viewer.log_directory', storage_path('logs')) . $filePath . $fileName;
 
-        if (!File::exists($filePath)) {
+        if (!File::exists($fullPath)) {
             abort(404, 'Log file not found.');
         }
 
-        if (pathinfo($filePath, PATHINFO_EXTENSION) === 'xml') {
-            $xmlContent = File::get($filePath);
+        if (pathinfo($fullPath, PATHINFO_EXTENSION) === 'xml') {
+            $xmlContent = File::get($fullPath);
             return view('log-viewer::log-viewer.show-data', [
                 'filePath' => $filePath,
-                'filename' => $filename,
+                'fileName' => $fileName,
                 'xmlContent' => $xmlContent
             ]);
         }
 
-        if (pathinfo($filePath, PATHINFO_EXTENSION) === 'json') {
-            $jsonContent = File::get($filePath);
+        if (pathinfo($fullPath, PATHINFO_EXTENSION) === 'json') {
+            $jsonContent = File::get($fullPath);
             $jsonContentDecoded = json_decode($jsonContent, true);
             $jsonContentEncoded = json_encode($jsonContentDecoded, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
 
             return view('log-viewer::log-viewer.show-data', [
                 'filePath' => $filePath,
-                'filename' => $filename,
+                'fileName' => $fileName,
                 'xmlContent' => $jsonContentEncoded
             ]);
         }
 
-        if (pathinfo($filePath, PATHINFO_EXTENSION) === 'log') {
-            $logData = $this->logViewer->getLogContents($filePath);
+        if (pathinfo($fullPath, PATHINFO_EXTENSION) === 'log') {
+            $logData = $this->logViewer->getLogContents($fullPath);
 
             return view('log-viewer::log-viewer.show', [
-                'filename' => $filename,
+                'filePath'    => $filePath,
+                'fileName'    => $fileName,
                 'logContents' => $logData['entries'],
-                'counts' => $logData['counts'],
-                'filePath' => $filePath
+                'counts'      => $logData['counts']
             ]);
         }
 
-        return view('errors.404', []);
+        return view('log-viewer::log-viewer.show', [
+            'filePath'    => $filePath,
+            'fileName'    => $fileName,
+            'logContents' => [],
+            'counts'      => []
+        ]);
     }
 
-    public function downloadFile(): BinaryFileResponse
+    public function downloadFile(Request $request): BinaryFileResponse
     {
-        $filename = request()->input('filename');
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|string',
+            'path' => 'required|string',
+        ]);
+        if ($validator->fails()) {
+            return redirect()->back();
+        }
 
-        $filePath = $this->logDir . '/' . $filename;
-        if (!File::exists($filePath) && in_array(File::extension($filePath), ['log', 'xml', 'json'])) {
+        $fileName = $request->input('file');
+        $filePath = $request->input('path');
+        $fullPath = config('log-viewer.log_directory', storage_path('logs')) . $filePath . $fileName;
+
+        if (!File::exists($fullPath) && in_array(File::extension($fullPath), ['log', 'xml', 'json'])) {
             abort(404, 'Log file not found.');
         }
 
-        return response()->download($filePath);
+        return response()->download($fullPath);
+    }
+
+    public function deleteFile(Request $request): RedirectResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|string',
+            'path' => 'required|string',
+        ]);
+        if ($validator->fails()) {
+            return redirect()->back();
+        }
+
+        $fileName = $request->input('file');
+        $filePath = $request->input('path');
+        $fullPath = config('log-viewer.log_directory', storage_path('logs')) . $filePath . $fileName;
+
+        if (!File::exists($fullPath) && in_array(File::extension($fullPath), ['log', 'xml', 'json'])) {
+            abort(404, 'Log file not found.');
+        }
+
+        File::delete($fullPath);
+
+        return redirect()->route('log-viewer.index');
     }
 
     public function downloadFullDirectory(): BinaryFileResponse

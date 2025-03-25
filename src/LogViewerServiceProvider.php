@@ -11,7 +11,7 @@ class LogViewerServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/resources/views', 'log-viewer');
         $this->loadRoutesFrom(__DIR__ . '/routes/web.php');
         $this->publishes([
-            __DIR__ . '/resources/views' => resource_path('views/vendor/log-viewer'),
+            __DIR__ . '/resources/views' => resource_path('views/vendor'),
         ], 'log-viewer-views');
         $this->publishes([
             __DIR__ . '/config/log-viewer.php' => config_path('log-viewer.php'),
