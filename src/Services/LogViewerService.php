@@ -38,6 +38,10 @@ class LogViewerService
 
     private function formatBytes(int $bytes): string
     {
+        if ($bytes == 0 ) {
+            return 'n/a';
+        }
+
         $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
         $factor = floor(log($bytes, 1024));
         return sprintf("%.2f %s", $bytes / pow(1024, $factor), $units[$factor]);
