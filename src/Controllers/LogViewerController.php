@@ -3,18 +3,22 @@
 namespace Fixik\LogViewer\Controllers;
 
 use Fixik\LogViewer\Services\LogViewerService;
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use ZipArchive;
 
 class LogViewerController extends Controller
 {
     private string $logDir;
+
     private LogViewerService $logViewer;
 
     public function __construct(LogViewerService $logViewer)
@@ -25,80 +29,70 @@ class LogViewerController extends Controller
 
     public function index(): View
     {
-        $logStructure = $this->logViewer->getDirectoryStructure($this->logDir);
+        if (!File::exists($this->logDir) || !File::isDirectory($this->logDir)) {
+            $logStructure = [];
+        } else {
+            $logStructure = $this->logViewer->getDirectoryStructure($this->logDir);
+        }
 
         return view('log-viewer::log-viewer.index', compact('logStructure'));
     }
 
-    /**
-     * @throws FileNotFoundException
-     */
     public function show(Request $request): View
     {
-        $fileName = $request->query('file');
-        $filePath = $request->query('path');
-        $fullPath = config('log-viewer.log_directory', storage_path('logs')) . $filePath . $fileName;
+        $fullPath = $this->getValidatedAndSecurePath(
+            $request->query('path', ''),
+            $request->query('file')
+        );
 
-        if (!File::exists($fullPath)) {
-            abort(404, 'Log file not found.');
+        if (!$fullPath) {
+            abort(404, 'Log file not found or access denied. Ensure the path and file are valid and within the configured log directory.');
         }
 
-        if (pathinfo($fullPath, PATHINFO_EXTENSION) === 'xml') {
-            $xmlContent = File::get($fullPath);
-            return view('log-viewer::log-viewer.show-data', [
-                'filePath' => $filePath,
-                'fileName' => $fileName,
-                'xmlContent' => $xmlContent
-            ]);
+        $fileName = basename($fullPath);
+        $relativePath = Str::after(dirname($fullPath), realpath($this->logDir));
+        $filePath = empty($relativePath) ? '/' : $relativePath;
+
+
+        $fileSize = File::size($fullPath);
+        $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
+
+        switch ($extension) {
+            case 'xml':
+                return view('log-viewer::log-viewer.show-data', [
+                    'filePath' => $filePath,
+                    'fileName' => $fileName,
+                    'content' => File::get($fullPath),
+                    'title' => "Viewing XML: $fileName"
+                ]);
+
+            case 'json':
+                $jsonContent = File::get($fullPath);
+                $jsonDecoded = json_decode($jsonContent, true);
+                $prettyJson = json_encode($jsonDecoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                return view('log-viewer::log-viewer.show-data', [
+                    'filePath' => $filePath,
+                    'fileName' => $fileName,
+                    'content' => $prettyJson,
+                    'title' => "Viewing JSON: $fileName"
+                ]);
+
+            case 'log':
+                return $this->renderLogFile($request, $filePath, $fileName, $fullPath);
+
+            default:
+                return $this->renderEmptyLog($filePath, $fileName);
         }
-
-        if (pathinfo($fullPath, PATHINFO_EXTENSION) === 'json') {
-            $jsonContent = File::get($fullPath);
-            $jsonContentDecoded = json_decode($jsonContent, true);
-            $jsonContentEncoded = json_encode($jsonContentDecoded, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
-
-            return view('log-viewer::log-viewer.show-data', [
-                'filePath' => $filePath,
-                'fileName' => $fileName,
-                'xmlContent' => $jsonContentEncoded
-            ]);
-        }
-
-        if (pathinfo($fullPath, PATHINFO_EXTENSION) === 'log') {
-            $logData = $this->logViewer->getLogContents($fullPath);
-
-            return view('log-viewer::log-viewer.show', [
-                'filePath'    => $filePath,
-                'fileName'    => $fileName,
-                'logContents' => $logData['entries'],
-                'counts'      => $logData['counts']
-            ]);
-        }
-
-        return view('log-viewer::log-viewer.show', [
-            'filePath'    => $filePath,
-            'fileName'    => $fileName,
-            'logContents' => [],
-            'counts'      => []
-        ]);
     }
 
     public function downloadFile(Request $request): BinaryFileResponse
     {
-        $validator = Validator::make($request->all(), [
-            'file' => 'required|string',
-            'path' => 'required|string',
-        ]);
-        if ($validator->fails()) {
-            return redirect()->back();
-        }
-
-        $fileName = $request->input('file');
-        $filePath = $request->input('path');
-        $fullPath = config('log-viewer.log_directory', storage_path('logs')) . $filePath . $fileName;
-
-        if (!File::exists($fullPath) && in_array(File::extension($fullPath), ['log', 'xml', 'json'])) {
-            abort(404, 'Log file not found.');
+        $fullPath = $this->getValidatedAndSecurePath(
+            $request->input('path'),
+            $request->input('file')
+        );
+        if (!$fullPath) {
+            abort(403, 'Access Denied: Invalid file path or access is not allowed.');
         }
 
         return response()->download($fullPath);
@@ -106,61 +100,156 @@ class LogViewerController extends Controller
 
     public function deleteFile(Request $request): RedirectResponse
     {
-        $validator = Validator::make($request->all(), [
-            'file' => 'required|string',
-            'path' => 'required|string',
-        ]);
-        if ($validator->fails()) {
-            return redirect()->back();
+        $fullPath = $this->getValidatedAndSecurePath(
+            $request->input('path'),
+            $request->input('file')
+        );
+        if (!$fullPath) {
+            abort(403, 'Access Denied: Invalid file path or access is not allowed.');
         }
 
-        $fileName = $request->input('file');
-        $filePath = $request->input('path');
-        $fullPath = config('log-viewer.log_directory', storage_path('logs')) . $filePath . $fileName;
-
-        if (!File::exists($fullPath) && in_array(File::extension($fullPath), ['log', 'xml', 'json'])) {
-            abort(404, 'Log file not found.');
+        if (!File::exists($fullPath)) {
+            return redirect()->route('log-viewer.index')->with('error', 'File not found: ' . basename($fullPath));
         }
 
         File::delete($fullPath);
 
-        return redirect()->route('log-viewer.index');
+        return redirect()->route('log-viewer.index')->with('success', 'File "' . basename($fullPath) . '" deleted successfully.');
     }
 
-    public function downloadFullDirectory(): BinaryFileResponse
+    public function downloadFullDirectory(Request $request): BinaryFileResponse
     {
-        $directory = request()->input('directory');
-        $directoryPath = $this->logDir . '/' . $directory;
-        if (!is_dir($directoryPath)) {
-            abort(404, 'Directory not found.');
+        $directoryPath = $this->getValidatedAndSecurePath($request->input('directory'), null);
+        if (!$directoryPath || !is_dir($directoryPath)) {
+            abort(404, 'Directory not found or access denied. Ensure the directory is valid and within the configured log directory.');
         }
 
-        $zipFileName = $directory . '.zip';
-        $zipFilePath = storage_path($zipFileName);
+        $zipFileName = basename($directoryPath) . '.zip';
+        $zipFilePath = storage_path('app/' . $zipFileName);
 
-        $zip = new \ZipArchive();
-
-        if ($zip->open($zipFilePath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) === true) {
-            $files = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($directoryPath),
-                \RecursiveIteratorIterator::LEAVES_ONLY
-            );
-
-            foreach ($files as $name => $file) {
-                if (!$file->isDir()) {
-                    $filePath = $file->getRealPath();
-                    $relativePath = substr($filePath, strlen($directoryPath) + 1);
-
-                    $zip->addFile($filePath, $relativePath);
-                }
-            }
-
-            $zip->close();
-        } else {
+        $zip = new ZipArchive();
+        if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             abort(500, 'Could not create ZIP file.');
         }
+
+        $files = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($directoryPath, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::LEAVES_ONLY
+        );
+
+        foreach ($files as $file) {
+            /** @var \SplFileInfo $file */
+            if (!$file->isDir()) {
+                $filePath = $file->getRealPath();
+                $relativePath = Str::after($filePath, $directoryPath . DIRECTORY_SEPARATOR);
+                $zip->addFile($filePath, $relativePath);
+            }
+        }
+        $zip->close();
 
         return response()->download($zipFilePath)->deleteFileAfterSend(true);
     }
 
+    public function deleteDirectory(Request $request): RedirectResponse
+    {
+        $directoryPath = $this->getValidatedAndSecurePath($request->input('directory'), null);
+        if (!$directoryPath || !is_dir($directoryPath)) {
+            abort(404, 'Directory not found or access denied. Ensure the directory is valid and within the configured log directory.');
+        }
+
+        if (realpath($directoryPath) === realpath($this->logDir)) {
+            return redirect()->route('log-viewer.index')->with('error', 'Cannot delete the root log directory.');
+        }
+
+        if (!File::exists($directoryPath)) {
+            return redirect()->route('log-viewer.index')->with('error', 'Directory not found: ' . basename($directoryPath));
+        }
+
+        File::deleteDirectory($directoryPath);
+
+        return redirect()->route('log-viewer.index')->with('success', 'Directory "' . basename($directoryPath) . '" deleted successfully.');
+    }
+
+    private function getValidatedAndSecurePath(?string $path, ?string $file = null): ?string
+    {
+        $rules = [
+            'path' => ['nullable', 'string', 'max:500', 'regex:/^[\w\d\s\/\-_\.]*$/'],
+        ];
+
+        $validatorData = ['path' => $path];
+
+        if ($file !== null) {
+            $rules['file'] = ['required', 'string', 'max:255', 'regex:/^[\w\d\-_\.]+\.(log|json|xml)$/i'];
+            $validatorData['file'] = $file;
+        } else {
+            $rules['path'][] = 'required';
+        }
+
+        $validator = Validator::make($validatorData, $rules);
+
+        if ($validator->fails()) {
+            return null;
+        }
+
+        $realLogDir = realpath($this->logDir) ?: $this->logDir;
+
+        $fullUnsafePath = rtrim($realLogDir, DIRECTORY_SEPARATOR);
+        if (!empty($path)) {
+            $normalizedPathSegment = str_replace(['\\', '/'], DIRECTORY_SEPARATOR, trim($path, '/\\'));
+            $fullUnsafePath .= DIRECTORY_SEPARATOR . $normalizedPathSegment;
+        }
+
+        if ($file !== null) {
+            $fullUnsafePath .= DIRECTORY_SEPARATOR . $file;
+        }
+
+        $realPath = realpath($fullUnsafePath);
+
+        if ($realPath === false || !Str::startsWith($realPath, $realLogDir)) {
+            return null;
+        }
+
+        if ($file !== null && !is_file($realPath)) {
+            return null;
+        }
+
+        if ($file === null && !is_dir($realPath)) {
+            return null;
+        }
+
+        return $realPath;
+    }
+
+    private function renderLogFile(Request $request, string $filePath, string $fileName, string $fullPath): View
+    {
+        $summary = $this->logViewer->getLogSummary($fullPath);
+        $entries = $this->logViewer->getLogContents($fullPath);
+
+        return view('log-viewer::log-viewer.show', [
+            'filePath'    => $filePath,
+            'fileName'    => $fileName,
+            'entries'     => $entries['entries'],
+            'summary'     => $summary,
+            'title'       => "Viewing Log: $fileName",
+        ]);
+    }
+
+    private function renderTooLargeFile(string $filePath, string $fileName, int $fileSize): View
+    {
+        return view('log-viewer::log-viewer.show-too-large', [
+            'filePath' => $filePath,
+            'fileName' => $fileName,
+            'fileSize' => $this->logViewer->formatBytes($fileSize),
+            'title'    => "File Too Large: $fileName"
+        ]);
+    }
+
+    private function renderEmptyLog(string $filePath, string $fileName): View
+    {
+        return view('log-viewer::log-viewer.show-empty', [
+            'filePath' => $filePath,
+            'fileName' => $fileName,
+            'title'    => "Empty/Unreadable Log: $fileName"
+        ]);
+    }
 }

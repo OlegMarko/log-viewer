@@ -11,4 +11,5 @@ Route::prefix(config('log-viewer.routes.prefix'))
         Route::post('/download', [LogViewerController::class, 'downloadFile'])->name('log-viewer.download');
         Route::post('/delete', [LogViewerController::class, 'deleteFile'])->name('log-viewer.delete-file');
         Route::post('/download-directory', [LogViewerController::class, 'downloadFullDirectory'])->name('log-viewer.download-zip');
+        Route::delete('/delete-directory', [LogViewerController::class, 'deleteDirectory'])->name('log-viewer.delete-directory');
     });
