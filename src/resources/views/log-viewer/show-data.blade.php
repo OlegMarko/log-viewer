@@ -1,40 +1,54 @@
 @extends('log-viewer::log-viewer.layouts.main')
 
-@section('title', "Viewing Log: $fileName")
+@section('title', $title)
 @section('heading', "Viewing Log: $fileName")
 
-@push('head')
-    <style>
-        pre {
-            background-color: #f1f1f1;
-            padding: 15px;
-            border-radius: 5px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            font-family: 'Roboto Mono', monospace;
-        }
-
-        .download-form {
-            float: right;
-        }
-    </style>
-@endpush
-
 @section('content')
-    <a href="{{ route('log-viewer.index') }}" class="btn btn-sm btn-secondary mb-4">
-        <i class="bi bi-arrow-left"></i> Back to Logs
-    </a>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{{ route('log-viewer.index') }}" class="btn btn-sm btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Logs
+        </a>
+        <div>
+            <button type="button" class="btn btn-sm btn-danger me-3" data-bs-toggle="modal" data-bs-target="#deleteConfirmationModal">
+                <i class="bi bi-trash"></i> Destroy
+            </button>
+            <form class="download-form" method="POST" action="{{ route('log-viewer.download') }}" style="display: inline-block;">
+                @csrf
+                <input type="hidden" name="path" value="{{ $filePath }}">
+                <input type="hidden" name="file" value="{{ $fileName }}">
+                <button type="submit" class="btn btn-sm btn-primary">
+                    <i class="bi bi-download"></i> Download
+                </button>
+            </form>
+        </div>
+    </div>
 
-    <form class="download-form" method="POST" action="{{ route('log-viewer.download') }}">
-        @csrf
+    <div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-labelledby="deleteConfirmationModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteConfirmationModalLabel">Confirm Deletion</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Are you sure you want to delete the file "<strong>{{ $fileName }}</strong>"? This action cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form id="confirmDeleteForm" method="POST" action="{{ route('log-viewer.delete-file') }}" style="display: inline;">
+                        @csrf
+                        <input type="hidden" name="path" value="{{ $filePath }}">
+                        <input type="hidden" name="file" value="{{ $fileName }}">
+                        <button type="submit" class="btn btn-danger">Delete Anyway</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        <input type="hidden" name="path" value="{{ $filePath }}">
-        <input type="hidden" name="file" value="{{ $fileName }}">
-
-        <button type="submit" class="btn btn-sm btn-primary mb-4">
-            <i class="bi bi-download"></i> Download
-        </button>
-    </form>
-
-    <pre class="bg-custom p-3 rounded">{{ $xmlContent }}</pre>
+    <div class="card">
+        <div class="card-body">
+            <pre>{!! $content !!}</pre>
+        </div>
+    </div>
 @endsection
