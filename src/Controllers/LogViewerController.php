@@ -173,7 +173,7 @@ class LogViewerController extends Controller
     private function getValidatedAndSecurePath(?string $path, ?string $file = null): ?string
     {
         $rules = [
-            'path' => ['nullable', 'string', 'max:500', 'regex:/^[\w\d\s\/\-_\.]*$/'],
+            'path' => ['nullable', 'string', 'max:500', 'regex:/^[a-zA-Z0-9\/_\-.:]*$/'],
         ];
 
         $validatorData = ['path' => $path];
@@ -186,7 +186,6 @@ class LogViewerController extends Controller
         }
 
         $validator = Validator::make($validatorData, $rules);
-
         if ($validator->fails()) {
             return null;
         }

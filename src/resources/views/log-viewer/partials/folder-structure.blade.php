@@ -18,7 +18,7 @@
             <div class="collapse mt-2" id="folder-{{ Str::slug($key) }}">
                 <form method="POST" action="{{ route('log-viewer.download-zip') }}" class="d-inline">
                     @csrf
-                    <input type="hidden" name="directory" value="{{ $key }}">
+                    <input type="hidden" name="directory" value="{{ $item['path'] }}">
                     <button type="submit" class="btn btn-sm btn-secondary mb-2 me-2">
                         <i class="bi bi-download"></i> Download
                     </button>
@@ -28,7 +28,7 @@
                       onsubmit="return confirm('Are you sure you want to delete this directory and all its contents?')">
                     @csrf
                     @method('DELETE')
-                    <input type="hidden" name="directory" value="{{ $key }}">
+                    <input type="hidden" name="directory" value="{{ $item['path'] }}">
                     <button type="submit" class="btn btn-sm btn-danger mb-2">
                         <i class="bi bi-trash"></i> Delete
                     </button>
